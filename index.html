@@ -100,7 +100,7 @@
             selectedFiles = Array.from(event.target.files);
             
             // Validação
-            if (selectedFiles.length !== 42) {
+            if (selectedFiles.length !== 10) {
                 statusMessage.textContent = `Atenção: Você selecionou ${selectedFiles.length} fotos. Por favor, selecione exatamente 42.`;
                 statusMessage.style.display = 'block';
                 generateButton.disabled = true;
