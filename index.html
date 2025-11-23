@@ -1,118 +1,191 @@
-<script>
-const imageUpload = document.getElementById('imageUpload');
-const generatePdf = document.getElementById('generatePdf');
-const pdfPage = document.getElementById('pdf-page');
-const statusMessage = document.getElementById('status-message');
-const loadingMessage = document.getElementById('loading-message');
-const generateButton = document.getElementById('generatePdf');
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de PDF 3x4</title>
 
-const { jsPDF } = window.jspdf;
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
-let selectedFiles = [];
-let loadedImageUrls = [];
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .controles {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
 
-imageUpload.addEventListener('change', (event) => {
-    pdfPage.innerHTML = '';
-    statusMessage.style.display = 'none';
-    loadingMessage.style.display = 'none';
+        #pdf-page {
+            width: 210mm;
+            height: 297mm;
+            padding: 5mm;
+            box-sizing: border-box;
+            background-color: white;
+            border: 1px dashed #ccc;
+            display: grid;
+            grid-template-columns: repeat(6, 30mm);
+            grid-template-rows: repeat(7, 40mm);
+            justify-content: center;
+            align-content: center;
+            gap: 2mm;
+        }
 
-    loadedImageUrls.forEach(url => URL.revokeObjectURL(url));
-    loadedImageUrls = [];
+        .photo-item {
+            width: 30mm;
+            height: 40mm;
+            object-fit: cover;
+            border: 1px solid #eee;
+        }
 
-    selectedFiles = Array.from(event.target.files);
+        button {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
 
-    // NOVA REGRA — mínimo livre, máximo 42
-    if (selectedFiles.length > 42) {
-        statusMessage.textContent = `Você selecionou ${selectedFiles.length} fotos. O máximo permitido é 42.`;
-        statusMessage.style.display = 'block';
-        generateButton.disabled = true;
-        return;
-    }
+        button:disabled {
+            background-color: #ccc;
+        }
 
-    if (selectedFiles.length === 0) {
-        statusMessage.textContent = `Selecione pelo menos 1 foto.`;
-        statusMessage.style.display = 'block';
-        generateButton.disabled = true;
-        return;
-    }
+        #status-message {
+            color: #d9534f;
+            font-weight: bold;
+            display: none;
+        }
 
-    generateButton.disabled = true;
-    generateButton.textContent = 'Carregando...';
-    loadingMessage.style.display = 'block';
+        #loading-message {
+            color: #0b5ed7;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+</head>
+<body>
 
-    let imagePromises = [];
+    <div class="controles">
+        <h2>Gerador de Folha de Fotos 3x4</h2>
+        <p>Selecione até <strong>42 fotos</strong>.</p>
 
-    for (const file of selectedFiles) {
-        const img = document.createElement('img');
-        img.classList.add('photo-item');
+        <input type="file" id="imageUpload" accept="image/*" multiple>
+        <button id="generatePdf" disabled>Gerar PDF</button>
 
-        const url = URL.createObjectURL(file);
-        loadedImageUrls.push(url);
+        <p id="status-message"></p>
+        <p id="loading-message">Carregando fotos... Aguarde.</p>
+    </div>
 
-        const promise = new Promise((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject();
+    <div id="pdf-page"></div>
+
+    <script>
+        const imageUpload = document.getElementById('imageUpload');
+        const generatePdf = document.getElementById('generatePdf');
+        const pdfPage = document.getElementById('pdf-page');
+        const statusMessage = document.getElementById('status-message');
+        const loadingMessage = document.getElementById('loading-message');
+
+        let selectedFiles = [];
+        let loadedImageUrls = [];
+
+        const { jsPDF } = window.jspdf;
+
+        imageUpload.addEventListener('change', (event) => {
+            pdfPage.innerHTML = "";
+            statusMessage.style.display = "none";
+            loadingMessage.style.display = "none";
+
+            loadedImageUrls.forEach(url => URL.revokeObjectURL(url));
+            loadedImageUrls = [];
+
+            selectedFiles = Array.from(event.target.files);
+
+            if (selectedFiles.length === 0) {
+                statusMessage.textContent = "Selecione pelo menos 1 foto.";
+                statusMessage.style.display = "block";
+                generatePdf.disabled = true;
+                return;
+            }
+
+            if (selectedFiles.length > 42) {
+                statusMessage.textContent = `Você selecionou ${selectedFiles.length}. O máximo é 42.`;
+                statusMessage.style.display = "block";
+                generatePdf.disabled = true;
+                return;
+            }
+
+            loadingMessage.style.display = "block";
+            generatePdf.disabled = true;
+
+            let imagePromises = [];
+
+            for (const file of selectedFiles) {
+                const img = document.createElement('img');
+                img.classList.add('photo-item');
+
+                const url = URL.createObjectURL(file);
+                loadedImageUrls.push(url);
+
+                const promise = new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                });
+
+                img.src = url;
+                pdfPage.appendChild(img);
+                imagePromises.push(promise);
+            }
+
+            Promise.all(imagePromises).then(() => {
+                loadingMessage.style.display = "none";
+                generatePdf.disabled = false;
+            }).catch(() => {
+                statusMessage.textContent = "Erro ao carregar imagens.";
+                statusMessage.style.display = "block";
+                loadingMessage.style.display = "none";
+            });
         });
 
-        imagePromises.push(promise);
+        generatePdf.addEventListener('click', () => {
+            if (selectedFiles.length === 0) {
+                alert("Selecione fotos antes.");
+                return;
+            }
 
-        img.src = url;
-        pdfPage.appendChild(img);
-    }
+            generatePdf.disabled = true;
+            generatePdf.textContent = "Gerando PDF...";
+            loadingMessage.style.display = "block";
 
-    Promise.all(imagePromises)
-        .then(() => {
-            generateButton.disabled = false;
-            generateButton.textContent = 'Gerar PDF';
-            loadingMessage.style.display = 'none';
-        })
-        .catch((err) => {
-            console.error('Erro ao carregar a imagem:', err);
-            statusMessage.textContent = 'Erro ao carregar uma das imagens. Tente novamente.';
-            statusMessage.style.display = 'block';
-            loadingMessage.style.display = 'none';
-            generateButton.textContent = 'Gerar PDF';
+            html2canvas(pdfPage, { scale: 2 }).then(canvas => {
+                const pdf = new jsPDF("p", "mm", "a4");
+
+                const imgData = canvas.toDataURL("image/png");
+                pdf.addImage(imgData, "PNG", 0, 0, 210, 297);
+
+                pdf.save("folha_fotos_3x4.pdf");
+
+                generatePdf.disabled = false;
+                generatePdf.textContent = "Gerar PDF";
+                loadingMessage.style.display = "none";
+
+                loadedImageUrls.forEach(url => URL.revokeObjectURL(url));
+                loadedImageUrls = [];
+            });
         });
-});
+    </script>
 
-generatePdf.addEventListener('click', () => {
-    if (selectedFiles.length === 0) {
-        alert('Selecione pelo menos 1 foto.');
-        return;
-    }
-
-    generateButton.disabled = true;
-    generateButton.textContent = 'Gerando PDF...';
-    loadingMessage.style.display = 'block';
-
-    const element = document.getElementById('pdf-page');
-
-    const options = {
-        scale: 2,
-        useCORS: true,
-        logging: true
-    };
-
-    html2canvas(element, options).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-
-        pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
-        pdf.save('folha_fotos_3x4.pdf');
-
-        generateButton.disabled = false;
-        generateButton.textContent = 'Gerar PDF';
-        loadingMessage.style.display = 'none';
-
-        loadedImageUrls.forEach(url => URL.revokeObjectURL(url));
-        loadedImageUrls = [];
-
-    }).catch(err => {
-        console.error('Erro ao gerar PDF:', err);
-        alert('Erro ao gerar o PDF. Veja o console.');
-        generateButton.disabled = false;
-        generateButton.textContent = 'Gerar PDF';
-        loadingMessage.style.display = 'none';
-    });
-});
-</script>
+</body>
+</html>
